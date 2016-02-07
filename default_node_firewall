@@ -1,0 +1,94 @@
+iptables=`which iptables`;
+#modprobe=`which modprobe`;
+
+test -x $iptables || exit 0
+#test -x $modprobe || exit 0
+
+do_start () {
+    # Start iptables kernal modules? $modprobe ipt_multiport 
+    # First, flush all the rules.
+    $iptables -F INPUT
+    $iptables -F FORWARD
+    $iptables -F OUTPUT
+    # Set up policy, deny (DROP) by default
+    $iptables -P INPUT DROP
+    $iptables -P FORWARD DROP
+    $iptables -P OUTPUT ACCEPT
+    # Use the established and related fun stuff.
+    $iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+    $iptables -A INPUT  -m state --state ESTABLISHED,RELATED -j ACCEPT
+    ##############################################################################
+    # Default blocks.
+    ##############################################################################
+    #
+    ##############################################################################
+    # Default allows.
+    ##############################################################################
+    # Open up ssh.
+    # Carlin's home modem
+    $iptables -A INPUT -p tcp -s REDACTED --dport 22 -j ACCEPT 
+    # Franklin's home
+    #$iptables -A INPUT -p tcp -s franksip --dport 22 -j ACCEPT
+    # Heather's home
+    #$iptables -A INPUT -p tcp -s heathersip --dport 22 -j ACCEPT
+    # Mike's home
+    #$iptables -A INPUT -p tcp -s mikesip --dport 22 -j ACCEPT
+    # IBM's network
+    #$iptables -A INPUT -p tcp -s ibmsnetwork --dport 22 -j ACCEPT
+    # Let localhost do anything.
+    $iptables -A INPUT -s 127.0.0.1 -j ACCEPT
+    # Allow networking from all other kubes to do anything.
+    $iptables -A INPUT -s REDACTED -j ACCEPT #kube01
+    $iptables -A INPUT -s REDACTED -j ACCEPT #kube02
+    $iptables -A INPUT -s REDACTED -j ACCEPT #kube03
+    # Accept any and all icmp packets.
+    $iptables -A INPUT -p icmp -j ACCEPT
+    ##############################################################################
+    # Server specific allows / denies.
+    ##############################################################################
+    # Example line.
+    #$iptables -A INPUT -p tcp -s 10.123.456.789   --dport 123 -j ACCEPT
+    #$iptables -A INPUT -p tcp -s 10.1.11.51 --dport 60000 -j ACCEPT
+    #$iptables -A INPUT -p udp -s 10.1.2.22/32 -m multiport \
+    #   --dport 123,514 -m state --state NEW -j ACCEPT
+    ##############################################################################
+    # Default log.
+    ##############################################################################
+    # Log on   *)
+    $iptables -A INPUT -j LOG --log-level 7 --log-prefix "Firewall: "
+}
+do_stop () {
+    # Set up policy, allow (ACCEPT) by default
+    $iptables -P INPUT ACCEPT
+    $iptables -P FORWARD ACCEPT
+    $iptables -P OUTPUT ACCEPT
+    # Then flush all rules
+    $iptables -F INPUT
+    $iptables -F FORWARD
+    $iptables -F OUTPUT
+}
+do_status () {
+    $iptables -L
+}
+case "$1" in
+    start)
+        do_start
+        ;;
+    stop)
+        do_stop
+        ;;
+    restart)
+        do_stop
+        do_start
+        ;;
+    status)
+        do_status
+        ;;
+    *)
+        N=/etc/init.d/$SNAME
+        echo "Usage: $N {start|stop|restart|status}" >&2
+        exit 1
+        ;;
+esac
+
+exit 0
