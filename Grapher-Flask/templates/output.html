@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <meta Http-Equiv="Cache-Control" Content="no-cache">
+    <meta Http-Equiv="Pragma" Content="no-cache">
+    <meta Http-Equiv="Expires" Content="0">
+    <meta Http-Equiv="Pragma-directive: no-cache">
+    <meta Http-Equiv="Cache-directive: no-cache, no-store">
+
+    <head>
+        <title>Ansible Host Visualizer</title>
+
+        <link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="http://getbootstrap.com/examples/jumbotron-narrow/jumbotron-narrow.css" rel="stylesheet">
+    </head>
+
+    <body>
+
+        <div class="container">
+            <div class="header">
+                <h3>Ansible Host Visualizer</h3>
+            </div>
+
+            <div class="jumbotron">
+                {% if hostname %}
+                <h1>{{ hostname }}</h1>
+                    {% if u %}
+                    <img src="static/{{ u }}.png" />
+                    {% else %}
+                    <h1>Error, no image uuid</h1>
+                    {% endif %}
+                {% else %}
+                <h1>Error, hostname is a required field.</h1>
+                {% endif %}
+            </div>
+
+            <footer class="footer">
+                <p>&copy; some dude 2016 - GNU GENERAL PUBLIC LICENSE - Github link</p>
+            </footer>
+
+
+        </div>
+    </body>
+
+</html>

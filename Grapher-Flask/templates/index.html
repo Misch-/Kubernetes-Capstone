@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+
+    <head>
+        <title>Ansible Host Visualizer</title>
+
+        <link href="http://getbootstrap.com/dist/css/bootstrap.min.css" rel="stylesheet">
+        <link href="http://getbootstrap.com/examples/jumbotron-narrow/jumbotron-narrow.css" rel="stylesheet">
+    </head>
+
+    <body>
+
+        <div class="container">
+            <div class="header">
+                <h3>Ansible Host Visualizer</h3>
+            </div>
+
+            <div class="jumbotron">
+                <p>Drawing diagrams manually sucks. Upload your ansible configuration and we'll generate an inheritance graph for a chosen host. Bam! Done!</p>
+
+                <hr>
+                tar a directory with the following hosts file and optionally a group_vars folder <br><br>
+
+                <pre align="left">
+.
+├── group_vars
+│   ├── production-az-a.yml
+│   ├── production-web.yml
+│   ├── production.yml
+│   └── web.yml
+└── hosts
+                </pre>
+
+                tar -cvf /tmp/ansible.tar /etc/ansible/hosts /etc/ansible/group_vars/
+                <hr>
+
+                <div align="left">
+                <form action = "" method = "post">
+                    Host name:<br>
+                    <input type="text" name="hostname"><br><br>
+                    <input type="file" name="tar"><br>
+                    <button class="btn btn-lg btn-primary btn-block" type="submit">Upload</button>
+                </form>
+                </div>
+            </div>
+
+            <footer class="footer">
+                <p>&copy; some dude 2016 - GNU GENERAL PUBLIC LICENSE - Github link</p>
+            </footer>
+
+
+        </div>
+    </body>
+
+</html>
