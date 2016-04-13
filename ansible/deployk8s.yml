@@ -1,0 +1,96 @@
+- hosts: '{{ hosts }}'
+  remote_user: capstone
+  tasks:
+
+  - name: copy .bashrc
+    copy: src=/home/capstone/.bashrc dest=/home/capstone/.bashrc
+    # Adds aliases to ssh to each node in cluster
+
+- hosts: '{{ hosts }}:!proxy'
+  remote_user: capstone
+  tasks:
+  - name: Install Pycurl
+    apt: name=python-pycurl state=present
+    become: yes
+    # Install dependency for docker
+  
+  - name: update apt-get
+    apt: update_cache=yes
+    become: yes
+
+  - name: Install Docker
+    apt: name=docker-engine state=present force=yes
+    become: yes
+
+  - name: Run Docker
+    service: name=docker state=started
+    become: yes
+  
+  - name: download kubernetes
+    get_url: url=https://github.com/kubernetes/kubernetes/archive/v1.1.7.tar.gz dest=/home/capstone/kubernetesv1.1.7.tar.gz validate_certs=no
+    # Fetches kubernetes repo v1.1.7 from github
+
+  - unarchive: src=/home/capstone/kubernetesv1.1.7.tar.gz dest=/home/capstone/
+    # Extracts repo to capstone's home directory
+
+  - name: copy config-default.sh
+    template: src=/etc/ansible/configs/config-default.sh dest=/home/capstone/kubernetes-1.1.7/cluster/ubuntu/config-default.sh
+    # Modifies kubernetes installation; see file for changes
+
+  - name: copy kubectl.sh
+    copy: src=/etc/ansible/configs/kubectl.sh dest=/home/capstone/kubernetes-1.1.7/cluster/kubectl.sh
+    # Modifies kubernetes installation; see file for changes
+
+  - name: copy kube-env.sh
+    copy: src=/etc/ansible/configs/kube-env.sh dest=/home/capstone/kubernetes-1.1.7/cluster/kube-env.sh
+    # Modifies kubernetes installation; see file for changes
+
+- hosts: '{{ hosts }}:&master'
+  remote_user: capstone
+  tasks:
+
+  - name: create ssh key
+    command: /usr/bin/ssh-keygen -t rsa -b 4096 -N "" -f /root/.ssh/id_rsa  creates=/root/.ssh/id_rsa.pub
+    become: yes
+    # Put an ssh key on the master server for kubernetes setup to use for node communication
+
+  - name: Install python ptyprocess
+    apt: name=python-ptyprocess state=present
+    become: yes
+    # Dependency for python-pexpect
+
+  - name: Download python-pexpect
+    get_url: 
+      url="https://launchpad.net/ubuntu/+archive/primary/+files/python-pexpect_4.0.1-1_all.deb"
+      dest="/home/capstone/python-pexpect_4.0.1-1_all.deb"
+
+  - name: Install python-pexpect
+    apt: deb="/home/capstone/python-pexpect_4.0.1-1_all.deb"
+    become: yes
+    # Install python-pexpect on master to work with ansible 2.0 so ansible can answer password prompts for kube-up
+    
+  - name: Get password for capstone user
+    include_vars: ssh_password.yml
+
+  - name: Bring up the cluster with kube-up.sh
+    expect: 
+      chdir: /home/capstone/kubernetes-1.1.7/cluster
+      command: /home/capstone/kubernetes-1.1.7/cluster/kube-up.sh
+      responses:
+        (?i)password: "{{password}}"
+        # uses ansible-vault with /var/password to keep our capstone password encrypted
+    become: yes
+    # Run kube-up build script on master with replaced info of cluster to build
+
+- hosts: '{{ hosts }}:&proxy'
+  remote_user: capstone
+  tasks:
+  
+  - name: Install HAproxy
+    apt: name=haproxy state=present
+    become: yes
+
+  - name: copy haproxy.cfg
+    template: src=/etc/ansible/configs/haproxy.cfg dest=/etc/haproxy/haproxy.cfg
+    become: yes
+    # Modifies kubernetes installation; see file for changes
