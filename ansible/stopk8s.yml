@@ -1,0 +1,15 @@
+- hosts: 'all:&master'
+  remote_user: capstone
+  tasks:
+
+  - name: Get password for capstone user
+    include_vars: ssh_password.yml
+
+  - name: Bring down the cluster with kube-down.sh
+    expect: 
+      chdir: /home/capstone/kubernetes-1.1.7/cluster
+      command: /home/capstone/kubernetes-1.1.7/cluster/kube-down.sh
+      responses:
+        (?i)password: "{{password}}"
+        # uses ansible-vault with /var/password to keep our capstone password encrypted
+    become: yes

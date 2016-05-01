@@ -19,12 +19,12 @@
 # Define all your cluster nodes, MASTER node comes first"
 # And separated with blank space like <user_1@ip_1> <user_2@ip_2> <user_3@ip_3> 
 ################## CHANGED BY CAPSTONE ###################
-export nodes=${nodes:-"{% for host in groups["kluster2"] | difference(groups["proxy"]) %} capstone@{{ hostvars[host]['ansible_eth0']['ipv4']['address'] }}{%- endfor %}"}
+export nodes=${nodes:-"{% for host in groups["all"] | difference(groups["proxy"]) %} capstone@{{ hostvars[host]['ansible_eth0']['ipv4']['address'] }}{%- endfor %}"}
 ##########################################################
 
 # Define all your nodes role: a(master) or i(minion) or ai(both master and minion), must be the order same 
 ################## CHANGED BY CAPSTONE ###################
-role=${role:-"a{% for host in groups["kluster2"] | difference(groups["proxy"]) %}i {% endfor %}"}
+role=${role:-"a{% for host in groups["all"] | difference(groups["proxy"]) %}i {% endfor %}"}
 ##########################################################
 
 # If it practically impossible to set an array as an environment variable
@@ -33,7 +33,7 @@ export roles=($role)
 
 # Define minion numbers
 ################## CHANGED BY CAPSTONE ###################
-export NUM_MINIONS=${NUM_MINIONS:-{{ groups["kluster2"] | difference(groups["proxy"]) | length}}}
+export NUM_MINIONS=${NUM_MINIONS:-{{ groups["all"] | difference(groups["proxy"]) | length}}}
 ##########################################################
 # define the IP range used for service cluster IPs.
 # according to rfc 1918 ref: https://tools.ietf.org/html/rfc1918 choose a private ip range here.

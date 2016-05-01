@@ -1,19 +1,30 @@
-- hosts: '{{ hosts }}'
+# Put a bashrc with alises to ssh to each node in each node
+- hosts: 'all'
   remote_user: capstone
   tasks:
 
   - name: copy .bashrc
     copy: src=/home/capstone/.bashrc dest=/home/capstone/.bashrc
-    # Adds aliases to ssh to each node in cluster
 
-- hosts: '{{ hosts }}:!proxy'
+# Setup docker on all cluster nodes
+- hosts: 'all:!proxy'
   remote_user: capstone
   tasks:
+
+  - name: Check if Kubernetes is running
+    shell: "if ps axf | grep flannel | grep -vq grep; then echo true; else echo false; fi;"
+    register: k8s_is_running
+
   - name: Install Pycurl
     apt: name=python-pycurl state=present
     become: yes
     # Install dependency for docker
   
+  - name: copy docker source
+    copy: src=/etc/ansible/configs/docker.list dest=/etc/apt/sources.list.d/docker.list
+    become: yes
+    # Needs external connection to update apt with new repo
+
   - name: update apt-get
     apt: update_cache=yes
     become: yes
@@ -25,6 +36,44 @@
   - name: Run Docker
     service: name=docker state=started
     become: yes
+  
+
+# Connect minions that haven't already connected to master (check if flannel is running earlier in script; assume connected if yes)
+- hosts: 'all:!proxy:!master'
+  remote_user: capstone
+  tasks:
+  
+  - name: Start flanneld
+    #variables can't be subsituted into command for security reasons, use master group instead
+    command: /opt/bin/flanneld --etcd-endpoints=http://{{ hostvars[groups['master'][0]]['ansible_eth0']['ipv4']['address'] }}:4001
+    become: yes
+    #Run on node if flannel wasn't running earlier
+    when: k8s_is_running.stdout == "false"
+    #Run asynchronously so ansible doesn't hang forever upon running command
+    #Give heat death of the universe time limit
+    #https://github.com/ansible/ansible/issues/4778
+    #In a real environment, this would be configured as a service and started instead, hacky
+    async: 99999999999999999999999999
+    poll: 0
+
+  - name: Start kubelet
+    command: /opt/bin/kubelet --address=0.0.0.0 --port=10250 --hostname-override={{ ansible_eth0["ipv4"]["address"] }} --api-servers=http://{{ hostvars[groups['master'][0]]['ansible_eth0']['ipv4']['address'] }}:8080 --logtostderr=true --cluster-domain=cluster.local --cluster-dns=192.168.3.10
+    become: yes
+    when: k8s_is_running.stdout == "false"
+    async: 99999999999999999999999999
+    poll: 0
+  
+  - name: Start kube-proxy
+    command: /opt/bin/kube-proxy --master=http://{{ hostvars[groups['master'][0]]['ansible_eth0']['ipv4']['address'] }}:8080 --logtostderr=true
+    become: yes
+    when: k8s_is_running.stdout == "false"
+    async: 99999999999999999999999999
+    poll: 0
+
+#Download kubernetes and bring up kubernetes cluster from master if it isn't already up
+- hosts: 'all:&master'
+  remote_user: capstone
+  tasks:
   
   - name: download kubernetes
     get_url: url=https://github.com/kubernetes/kubernetes/archive/v1.1.7.tar.gz dest=/home/capstone/kubernetesv1.1.7.tar.gz validate_certs=no
@@ -45,17 +94,22 @@
     copy: src=/etc/ansible/configs/kube-env.sh dest=/home/capstone/kubernetes-1.1.7/cluster/kube-env.sh
     # Modifies kubernetes installation; see file for changes
 
-- hosts: '{{ hosts }}:&master'
-  remote_user: capstone
-  tasks:
-
   - name: create ssh key
     command: /usr/bin/ssh-keygen -t rsa -b 4096 -N "" -f /root/.ssh/id_rsa  creates=/root/.ssh/id_rsa.pub
     become: yes
     # Put an ssh key on the master server for kubernetes setup to use for node communication
 
-  - name: Install python ptyprocess
-    apt: name=python-ptyprocess state=present
+  - name: update apt-get
+    apt: update_cache=yes
+    become: yes
+ 
+  - name: Download python-ptyprocess
+    get_url: 
+      url="https://launchpad.net/ubuntu/+archive/primary/+files/python-ptyprocess_0.5-1_all.deb"
+      dest="/home/capstone/python-ptyprocess_0.5-1_all.deb"
+
+  - name: Install python-ptyprocess
+    apt: deb="/home/capstone/python-ptyprocess_0.5-1_all.deb"
     become: yes
     # Dependency for python-pexpect
 
@@ -72,6 +126,9 @@
   - name: Get password for capstone user
     include_vars: ssh_password.yml
 
+  - stat: path=/home/capstone/kubernetesv1.1.7.tar.gz
+    register: skipall
+
   - name: Bring up the cluster with kube-up.sh
     expect: 
       chdir: /home/capstone/kubernetes-1.1.7/cluster
@@ -80,11 +137,22 @@
         (?i)password: "{{password}}"
         # uses ansible-vault with /var/password to keep our capstone password encrypted
     become: yes
+    when: k8s_is_running.stdout == "false"
+
     # Run kube-up build script on master with replaced info of cluster to build
 
-- hosts: '{{ hosts }}:&proxy'
+  - name: Put kubectl in /bin
+    copy: src=/etc/ansible/configs/kubectl dest=/usr/bin/kubectl
+    become: yes
+
+#Setup proxy VM to loadbalance to kubernetes nodes
+- hosts: 'all:&proxy'
   remote_user: capstone
   tasks:
+  
+  - name: update apt-get
+    apt: update_cache=yes
+    become: yes
   
   - name: Install HAproxy
     apt: name=haproxy state=present
@@ -94,3 +162,7 @@
     template: src=/etc/ansible/configs/haproxy.cfg dest=/etc/haproxy/haproxy.cfg
     become: yes
     # Modifies kubernetes installation; see file for changes
+
+  - name: Restart HAproxy with new config in
+    service: name=haproxy state=restarted
+    become: yes

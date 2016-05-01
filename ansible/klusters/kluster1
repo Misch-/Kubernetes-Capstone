@@ -1,0 +1,15 @@
+# IP Addresses of vm's in cluster
+
+[kluster1]
+# kube1 - Master / Minion
+10.120.216.196
+# kube2 - Minion
+10.155.236.122
+# kube3 - Proxy
+10.155.236.107
+
+[master]
+10.120.216.196
+
+[proxy]
+10.155.236.107

@@ -1,0 +1,1 @@
+ansible-playbook deployk8s.yml -i klusters/kluster1 --vault-password-file=vars/vault_pass
